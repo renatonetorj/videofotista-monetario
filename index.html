@@ -644,6 +644,7 @@ async function exportJson(btn){
   try{
     const out=await montarBackup();
     await salvarArquivo(`MONETARIO_backup_${todayStr}.json`,new Blob([JSON.stringify(out)],{type:'application/json'}));
+    lsSet('vm_bk_manual',new Date().toISOString()); if(S.tab==='inicio') render();
   }catch(e){ if(e?.code==='declined') return; toast('Não consegui gerar o backup. Tente de novo.'); }
   finally{ btn.disabled=false; btn.textContent=old; }
 }
@@ -706,7 +707,7 @@ function renderInicio(){
   if(pendSubs) h+=`<button class="alert" style="width:100%;text-align:left;color:inherit" data-act="gomes"><span>◌</span><span>${pendSubs} ${pendSubs>1?'assinaturas previstas':'assinatura prevista'} para confirmar neste mês. Toque para ver.</span></button>`;
   h+=`<div class="home-acts">
     <button class="hbtn pri" data-act="novo" data-t="s"><b>− Lançar saída</b><span>gasto, conta, compra</span></button>
-    <button class="hbtn" data-act="novo" data-t="e"><b>+ Lançar entrada</b><span>aposentadoria, trabalho</span></button>
+    <button class="hbtn" data-act="novo" data-t="e"><b>+ Lançar entrada</b><span>salário, trabalho</span></button>
     <button class="hbtn" data-act="gomes"><b>Ver o mês</b><span>tudo de ${MESES[today.getMonth()].toLowerCase()}, por bloco</span></button>
     <button class="hbtn" data-act="gotab" data-tab="busca"><b>Buscar</b><span>em todos os anos</span></button></div>`;
   const tot=r2(P.reduce((a,i)=>a+i.valor,0));
@@ -726,6 +727,8 @@ function renderInicio(){
       h+=`<div class="due${i.n<0?' soon':''}"><div class="d"><b>${d}</b><small>${M3[Number(m)-1]}</small></div><span class="nm">${esc(i.nome)}<span class="when">${when}</span></span><span class="rt"><span class="num">~ ${fmt(i.valor)}</span><button class="mini ok" data-act="pagar" data-id="${esc(i.id)}" data-c="${i.comp}">Recebi</button></span></div>`; }
     h+=`</div></section>`; }
   if(last.length){ h+=`<section class="blk"><div class="blk-h"><h3>Últimos lançamentos</h3></div><div class="grp">${last.map(entryRow).join('')}</div></section>`; }
+  if(S.local&&S.lanc.length>=10){ const ult=lsGet('vm_bk_manual'); const dias=ult?Math.floor((Date.now()-new Date(ult).getTime())/864e5):999;
+    if(dias>=30) h+=`<section class="blk"><p class="note" style="margin:0">${ult?`Faz ${dias} dias desde o último backup.`:'Você ainda não baixou nenhum backup.'} Os dados ficam só neste aparelho, então vale guardar uma cópia.</p><div style="margin-top:10px"><button class="btn ghost" data-act="exportjson">Baixar backup agora</button></div></section>`; }
   main.innerHTML=h+cafeBtn();
 }
 function openFatPay(pid,comp){
@@ -1120,7 +1123,7 @@ function subYear(){
   yearUnsubs.push(S.db.doc('faturas/'+y).onSnapshot(d=>{ if(y!==S.year) return; S.fat=d.exists?(d.data().cartoes||{}):{}; render(); },onErr));
 }
 /* ===================== Firebase: dados na casa ===================== */
-const VERSAO='2.0';
+const VERSAO='2.1';
 // Preencha com o firebaseConfig do projeto videofotista-monetario.
 const FIREBASE={apiKey:"AIzaSyDuLcLCnn1Y35rTJ2Ll5IA_WcLwmHHhTic",authDomain:"videofotista-monetario.firebaseapp.com",projectId:"videofotista-monetario",storageBucket:"videofotista-monetario.firebasestorage.app",messagingSenderId:"210279865763",appId:"1:210279865763:web:e507a4c06276b192c7ce16"};
 const EMU=new URLSearchParams(location.search).get('emu');
@@ -1152,7 +1155,38 @@ function mkDB(base){
     where:(f,op,v)=>colApi(name,cons.concat([FB.where(f,op,v)])) }; };
   return {doc:docApi,collection:n=>colApi(n,[])};
 }
+const LKEY='vm_local_dados';
+let LS=null, LL=new Set(), lsTimer=null;
+function localCarregar(){ if(LS) return; LS={}; try{ const t=localStorage.getItem(LKEY); if(t) LS=JSON.parse(t)||{}; }catch(e){ LS={}; } }
+function localGravar(){ clearTimeout(lsTimer); lsTimer=setTimeout(()=>{ try{ localStorage.setItem(LKEY,JSON.stringify(LS)); }catch(e){ toast('Não consegui guardar neste aparelho. Baixe um backup em Ajustes.'); } },150); }
+function localMudou(){ localGravar(); setTimeout(()=>LL.forEach(f=>{ try{f()}catch(e){console.warn(e)} }),0); }
+const cl=o=>o===undefined?undefined:JSON.parse(JSON.stringify(o));
+function mkLocalDB(){
+  localCarregar();
+  const wd=(path)=>({id:path.split('/').pop(),exists:LS[path]!==undefined,data:()=>cl(LS[path])});
+  const ouvir=f=>{ LL.add(f); setTimeout(f,0); return ()=>LL.delete(f); };
+  const docApi=path=>({
+    get:async()=>wd(path),
+    set:async d=>{ LS[path]=cl(d); localMudou(); },
+    update:async d=>{ if(LS[path]===undefined) throw Object.assign(new Error('não existe'),{code:'not-found'}); LS[path]=Object.assign({},LS[path],cl(d)); localMudou(); },
+    delete:async()=>{ delete LS[path]; localMudou(); },
+    onSnapshot:cb=>ouvir(()=>cb(wd(path))) });
+  const colApi=(name,cons)=>{ const run=()=>{ const docs=[]; const pre=name+'/'; for(const k in LS){ if(k.startsWith(pre)&&!k.slice(pre.length).includes('/')&&cons.every(([f,op,v])=>op==='=='?LS[k][f]===v:true)) docs.push(wd(k)); } return {docs,size:docs.length,empty:!docs.length}; };
+    return { doc:id=>docApi(name+'/'+id),
+      add:async d=>{ const id=Date.now().toString(36)+Math.random().toString(36).slice(2,8); LS[name+'/'+id]=cl(d); localMudou(); return {id}; },
+      get:async()=>run(),
+      onSnapshot:cb=>ouvir(()=>cb(run())),
+      where:(f,op,v)=>colApi(name,cons.concat([[f,op,v]])) }; };
+  return {local:true,doc:docApi,collection:n=>colApi(n,[]),
+    lote:async ops=>{ for(const [p,d] of ops) LS[p]=cl(d); localMudou(); }};
+}
+function usarLocal(){
+  pararTudo(); lsSet('vm_modo','local');
+  S.local=true; S.casa={id:'local',nome:'Casa'};
+  S.db=mkLocalDB(); ligarCasa(); hideGate(); render(); autoBackup();
+}
 function pararTudo(){
+  S.local=false; LL.clear();
   try{casaUnsub&&casaUnsub()}catch(e){} casaUnsub=null;
   baseUnsubs.forEach(u=>{try{u()}catch(e){}}); baseUnsubs=[];
   yearUnsubs.forEach(u=>{try{u()}catch(e){}}); yearUnsubs=[];
@@ -1165,6 +1199,8 @@ function showGate(tipo,info){
   let h=logoHtml;
   if(tipo==='login'){
     const cria=info==='criar';
+    if(!cria) h+=`<section class="blk"><div class="blk-h"><h3>Começar a usar</h3></div><p class="note">Sem cadastro: os seus dados ficam guardados só neste aparelho, com você. Ninguém mais vê.</p><div class="acts" style="justify-content:flex-start"><button class="btn accent" data-act="g_local">Começar</button></div></section>
+    <p class="note" style="margin-top:22px">Foi convidado para uma casa? Entre com a sua conta:</p>`;
     h+=`<h2>${cria?'Criar conta':'Entrar'}</h2><p class="note">${cria?'Use o seu e-mail e crie uma senha só para este app (não precisa ser a do e-mail).':'Entre com o e-mail e a senha do Monetário.'}</p>
     <form id="g_form" autocomplete="on"><div class="fld"><label for="g_email">E-mail</label><input id="g_email" type="email" autocomplete="username" required value="${esc(lsGet('vm_email')||'')}"></div>
     <div class="fld"><label for="g_senha">Senha${cria?' (mínimo 6 caracteres)':''}</label><input id="g_senha" type="password" autocomplete="${cria?'new-password':'current-password'}" required minlength="6"></div>
@@ -1181,13 +1217,13 @@ function showGate(tipo,info){
   }
   if(tipo==='semcasa'){
     const em=(S.user?.email||'').toLowerCase();
-    h+=`<h2>Quase lá</h2><p class="note">Você entrou como <b>${esc(em)}</b>, mas ainda não faz parte de nenhuma casa.</p>
+    h+=`<h2>Quase lá</h2><p class="note">Você entrou como <b>${esc(em)}</b>, mas esse e-mail ainda não foi convidado para nenhuma casa.</p>
     <section class="blk"><div class="blk-h"><h3>Foi convidado(a)?</h3></div><p class="note">Peça para quem criou a casa te convidar com este e-mail: <b>${esc(em)}</b>. Depois toque em Verificar de novo.</p><div class="acts"><button class="btn accent" data-act="g_verificar">Verificar de novo</button></div></section>
-    <section class="blk"><div class="blk-h"><h3>É o primeiro a usar?</h3></div><p class="note">Crie a casa. Você vira o dono e pode convidar outras pessoas para lançar junto.</p><div class="acts"><button class="btn ghost" data-act="g_criarcasa">Criar a minha casa</button></div></section>
+    <section class="blk"><div class="blk-h"><h3>Quer usar sozinho?</h3></div><p class="note">Use sem conta: os seus dados ficam guardados só neste aparelho.</p><div class="acts"><button class="btn ghost" data-act="g_sairlocal">Usar sem conta</button></div></section>
     <div class="acts"><button class="lnk" data-act="sair">Sair e entrar com outro e-mail</button></div>`;
     gatebox.innerHTML=h; return;
   }
-  if(tipo==='semconfig'){ h+=`<h2>Falta configurar</h2><p class="note">Este app ainda não foi ligado ao banco de dados (Firebase). Avise o Claude.</p>`; gatebox.innerHTML=h; return; }
+  if(tipo==='semconfig'){ h+=`<section class="blk"><div class="blk-h"><h3>Começar a usar</h3></div><p class="note">Os seus dados ficam guardados só neste aparelho, com você.</p><div class="acts" style="justify-content:flex-start"><button class="btn accent" data-act="g_local">Começar</button></div></section>`; gatebox.innerHTML=h; return; }
   if(tipo==='erro'){ h+=`<h2>Não consegui abrir</h2><p class="note">${esc(info||'Confira a internet e tente de novo.')}</p><div class="acts"><button class="btn accent" data-act="g_verificar">Tentar de novo</button><button class="lnk" data-act="sair">Sair</button></div>`; gatebox.innerHTML=h; return; }
   h+=`<p class="note">${esc(info||'Abrindo…')}</p>`; gatebox.innerHTML=h;
 }
@@ -1214,9 +1250,12 @@ function usarCasa(id,data){
   S.casa=Object.assign({id},data); lsSet('vm_casa',id);
   S.db=mkDB('casas/'+id);
   casaUnsub=FB.onSnapshot(FB.doc(fs,'casas',id),s=>{ if(!s.exists()){ pararTudo(); showGate('semcasa'); return; } S.casa=Object.assign({id},s.data()); if(S.tab==='aj'&&!sheet.innerHTML) render(); },onErr);
+  ligarCasa(); hideGate(); render(); autoBackup();
+}
+function ligarCasa(){
   baseUnsubs.push(S.db.doc('config/main').onSnapshot(d=>{ S.loaded.cfg=true; S.cfg=d.exists?d.data():null; render(); },onErr));
   baseUnsubs.push(S.db.collection('recs').onSnapshot(q=>{ S.recs=q.docs.map(d=>Object.assign({id:d.id},d.data())); render(); },onErr));
-  subYear(); hideGate(); render(); autoBackup();
+  subYear();
 }
 const ehDono=()=>!!(S.casa&&S.user&&S.casa.dono===S.user.uid);
 async function criarCasa(){
@@ -1248,7 +1287,8 @@ async function importarArquivo(file){
   openSheet('Importar backup',`<p class="note">Backup de ${esc((b.exportadoEm||'').slice(0,10).split('-').reverse().join('/'))}: <b>${nL}</b> lançamentos, ${Object.keys(b.recs||{}).length} contas fixas e assinaturas, cartões e faturas.</p><p class="note">O que já estiver na casa com o mesmo registro é substituído pelo do backup. Nada mais é apagado.</p><div class="err" id="imp_err" hidden></div><div class="formacts"><div class="r"><button class="btn ghost" data-act="close">Cancelar</button><button class="btn accent" id="imp_go">Importar</button></div></div>`);
   document.getElementById('imp_go').onclick=async ev=>{ const btn=ev.currentTarget; btn.disabled=true;
     try{ const base='casas/'+S.casa.id+'/'; let feitos=0;
-      for(let i=0;i<ops.length;i+=400){ const wb=FB.writeBatch(fs); for(const [p,d] of ops.slice(i,i+400)) wb.set(FB.doc(fs,base+p),d); await wb.commit(); feitos+=Math.min(400,ops.length-i); btn.textContent=`Importando… ${Math.round(feitos/ops.length*100)}%`; }
+      if(S.db.local){ await S.db.lote(ops); feitos=ops.length; }
+      else for(let i=0;i<ops.length;i+=400){ const wb=FB.writeBatch(fs); for(const [p,d] of ops.slice(i,i+400)) wb.set(FB.doc(fs,base+p),d); await wb.commit(); feitos+=Math.min(400,ops.length-i); btn.textContent=`Importando… ${Math.round(feitos/ops.length*100)}%`; }
       closeSheet(); S.all=null; subYear(); toast(`Pronto: ${nL} lançamentos importados`);
     }catch(e){ console.warn(e); btn.disabled=false; btn.textContent='Importar'; const er=document.getElementById('imp_err'); er.textContent='Não consegui importar ('+(e.code||'erro')+'). Tente de novo.'; er.hidden=false; } };
 }
@@ -1284,6 +1324,7 @@ function abrirCafe(){
   <p class="note" style="text-align:center;margin:12px auto 0"><a href="https://renatoneto.com.br" target="_blank" rel="noopener" style="color:var(--accent)">renatoneto.com.br</a></p>`);
 }
 function casaHtml(){
+  if(S.local) return `<section class="blk"><div class="blk-h"><h3>Onde ficam os dados</h3></div><p class="note">Tudo fica guardado só neste aparelho, sem conta e sem nuvem. Ninguém mais vê.</p><p class="note" style="margin-top:8px"><b>Importante:</b> se o aparelho quebrar, for trocado ou o app for apagado, os dados vão junto. Baixe o backup completo (.json) uma vez por mês e guarde no Drive, no e-mail ou no computador. Para passar para outro aparelho, é só importar esse arquivo lá.</p><div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn accent" data-act="exportjson">Baixar backup completo (.json)</button></div><div style="margin-top:12px"><button class="btn ghost" data-act="sairlocal">Entrar com uma conta</button></div><p class="note" style="margin-top:6px">Os dados deste aparelho continuam guardados aqui.</p></section>`;
   if(!S.casa) return '';
   const em=(S.user?.email||'').toLowerCase(), dono=ehDono(), donoEm=S.casa.donoEmail;
   let h=`<section class="blk"><div class="blk-h"><h3>Casa e acesso</h3></div><p class="note" style="margin:0 0 8px">Você entrou como <b>${esc(em)}</b>${dono?' <span class="pill">dono</span>':''}. Quem está na lista abaixo vê e mexe em tudo.</p><div class="grp">`;
@@ -1299,6 +1340,9 @@ document.addEventListener('click',async ev=>{
   if(a==='copiapix'){ copiar(pixPayload(),'Pix Copia e Cola copiado. Cole no app do banco.'); return; }
   if(a==='copiachave'){ copiar(PIX.chave,'Chave Pix copiada'); return; }
   if(a==='g_criar'){ showGate('login','criar'); return; }
+  if(a==='g_local'){ usarLocal(); return; }
+  if(a==='g_sairlocal'){ pararTudo(); try{ await FB.signOut(auth); }catch(e){} usarLocal(); return; }
+  if(a==='sairlocal'){ lsSet('vm_modo',''); pararTudo(); if(S.user) abrirCasa(); else showGate(window.FB&&auth?'login':'semconfig'); return; }
   if(a==='g_login'){ showGate('login'); return; }
   if(a==='g_esqueci'){ const em=(document.getElementById('g_email')?.value||'').trim(); const er=document.getElementById('g_err');
     if(!em){ er.textContent='Digite o seu e-mail e toque de novo em Esqueci a senha.'; er.hidden=false; return; }
@@ -1317,9 +1361,11 @@ document.addEventListener('click',async ev=>{
 
 function onErr(e){ console.warn(e); if(e?.code==='permission-denied'&&S.user){ pararTudo(); abrirCasa(); } }
 function boot(){
-  if(!initFB()){ showGate('semconfig'); return; }
-  showGate('carregando','Abrindo…');
-  FB.onAuthStateChanged(auth,u=>{ S.user=u; pararTudo(); if(!u){ showGate('login'); return; } abrirCasa(); });
+  const ok=initFB(); const local=lsGet('vm_modo')==='local';
+  if(local) usarLocal();
+  if(!ok){ if(!local) showGate('semconfig'); return; }
+  if(!local) showGate('carregando','Abrindo…');
+  FB.onAuthStateChanged(auth,u=>{ S.user=u; if(lsGet('vm_modo')==='local') return; pararTudo(); if(!u){ showGate('login'); return; } abrirCasa(); });
 }
 boot();
 })();
