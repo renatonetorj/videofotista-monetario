@@ -1,6 +1,6 @@
 # Videofotista Monetário
 
-Ganhos e gastos da casa, no celular e no Mac. Um presente de [Renato Neto, O Videofotista](https://renatoneto.com.br): é grátis, sem cadastro e sem senha.
+Ganhos e gastos da casa, no celular e no computador (Windows ou Mac). Um presente de [Renato Neto, O Videofotista](https://renatoneto.com.br): é grátis, sem cadastro e sem senha.
 
 ![Tela](tela.png)
 
@@ -15,15 +15,24 @@ Ganhos e gastos da casa, no celular e no Mac. Um presente de [Renato Neto, O Vid
 
 ## Seus dados ficam com você
 
-O app não tem servidor nem conta: tudo fica guardado só no aparelho onde você usa. Ninguém mais vê, nem quem fez o app.
+O app não tem servidor: ninguém vê os seus dados, nem quem fez o app. Na primeira tela, escolha:
 
-Por isso, **baixe o backup completo (.json) uma vez por mês** em Ajustes e guarde no Drive, no e-mail ou no computador. Se trocar de aparelho, é só importar esse arquivo no novo (Ajustes > Importar backup).
+- **Começar**: tudo fica guardado só neste aparelho. Baixe o backup completo (.json) uma vez por mês em Ajustes.
+- **Entrar com o Google**: para usar no celular **e** no computador. Os dados ficam num arquivo no **seu** Google Drive ("Videofotista Monetário - dados.json"), e todos os seus aparelhos usam o mesmo arquivo. O app só enxerga os arquivos que ele mesmo criou no seu Drive.
+
+[Política de privacidade](privacidade.html)
 
 ## No celular
 
 1. Abra **https://renatonetorj.github.io/videofotista-monetario/** no Safari (iPhone) ou no Chrome (Android)
 2. iPhone: Compartilhar > **Adicionar à Tela de Início**. Android: menu > **Adicionar à tela inicial**
-3. Abra pelo ícone novo e toque em **Começar**
+3. Abra pelo ícone novo e toque em **Começar** ou **Entrar com o Google**
+
+## No Windows (ou em qualquer computador)
+
+1. Abra o mesmo link no **Chrome** ou no **Edge**
+2. Na barra de endereço, clique no ícone **Instalar** (um monitor com uma seta) para virar app, com ícone no menu Iniciar
+3. Toque em **Entrar com o Google** com a mesma conta do celular: tudo aparece lá
 
 ## No Mac
 
@@ -31,6 +40,8 @@ Por isso, **baixe o backup completo (.json) uma vez por mês** em Ajustes e guar
 2. Descompacte e clique duas vezes em **Instalar.command**
 3. Se o Mac bloquear: Ajustes do Sistema > Privacidade e Segurança > **Abrir Mesmo Assim**
 4. Toque em **Começar**
+
+O app do Mac guarda os dados só no Mac. Para sincronizar o Mac com o celular, use pelo navegador (Safari ou Chrome), com **Entrar com o Google**.
 
 O app fica em Aplicativos, com backup automático todo dia em Documentos (e no Google Drive, se estiver instalado). Precisa das Ferramentas de Linha de Comando da Apple; se não tiver, o instalador avisa e abre a instalação. Dentro do zip tem a pasta **Prints** com as telas do app.
 

@@ -238,6 +238,7 @@ header.top{padding-block:18px 10px}
 .brand h1.fam{font-size:24px}
 .brand h1.fam .marca svg{width:22px;height:22px}
 .hojeinfo{color:var(--muted);font-size:13px;margin-top:6px}
+.syncinfo{display:inline-block;margin-top:6px;background:none;border:0;color:var(--muted);font:inherit;font-size:12px;cursor:pointer;padding:2px 8px;border-radius:99px}.syncinfo.alerta{background:var(--accent);color:#2b2b2b;font-weight:700;padding:5px 12px}
 .tabs{position:static!important;margin-top:14px;gap:8px;justify-content:center;flex-wrap:nowrap;overflow-x:auto;max-width:100%;padding:2px 2px 4px!important;border:0!important;background:none!important;scrollbar-width:none}
 .tabs::-webkit-scrollbar{display:none}
 .tabs button{flex:none;background:var(--surface);color:#fff;padding:8px 16px;font-weight:700;font-size:14px}
@@ -273,7 +274,7 @@ body{margin:0;padding-top:env(safe-area-inset-top,0px)}
   <header class="top">
     <div class="brand">
       <h1 class="fam" aria-label="Videofotista Monetário"><span class="marca"><span>VIDEOF</span><svg viewBox="0 0 26 26" aria-hidden="true"><circle cx="13" cy="13" r="10.5" fill="none" stroke="currentColor" stroke-width="4"/><text x="13" y="17.6" text-anchor="middle" font-size="13" font-weight="900" fill="currentColor" font-family="-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif">$</text></svg><span>TISTA</span></span><span class="app">MONETÁRIO</span></h1>
-      <div class="hojeinfo" id="hojeinfo"></div>
+      <div class="hojeinfo" id="hojeinfo"></div><button class="syncinfo" id="syncinfo" data-act="sync" hidden></button>
       <nav class="tabs" id="tabs">
         <button data-tab="inicio" aria-current="true">Início</button>
         <button data-tab="mes">Mês</button>
@@ -727,7 +728,7 @@ function renderInicio(){
       h+=`<div class="due${i.n<0?' soon':''}"><div class="d"><b>${d}</b><small>${M3[Number(m)-1]}</small></div><span class="nm">${esc(i.nome)}<span class="when">${when}</span></span><span class="rt"><span class="num">~ ${fmt(i.valor)}</span><button class="mini ok" data-act="pagar" data-id="${esc(i.id)}" data-c="${i.comp}">Recebi</button></span></div>`; }
     h+=`</div></section>`; }
   if(last.length){ h+=`<section class="blk"><div class="blk-h"><h3>Últimos lançamentos</h3></div><div class="grp">${last.map(entryRow).join('')}</div></section>`; }
-  if(S.local&&S.lanc.length>=10){ const ult=lsGet('vm_bk_manual'); const dias=ult?Math.floor((Date.now()-new Date(ult).getTime())/864e5):999;
+  if(S.local&&!driveOn()&&S.lanc.length>=10){ const ult=lsGet('vm_bk_manual'); const dias=ult?Math.floor((Date.now()-new Date(ult).getTime())/864e5):999;
     if(dias>=30) h+=`<section class="blk"><p class="note" style="margin:0">${ult?`Faz ${dias} dias desde o último backup.`:'Você ainda não baixou nenhum backup.'} Os dados ficam só neste aparelho, então vale guardar uma cópia.</p><div style="margin-top:10px"><button class="btn ghost" data-act="exportjson">Baixar backup agora</button></div></section>`; }
   main.innerHTML=h+cafeBtn();
 }
@@ -1123,7 +1124,7 @@ function subYear(){
   yearUnsubs.push(S.db.doc('faturas/'+y).onSnapshot(d=>{ if(y!==S.year) return; S.fat=d.exists?(d.data().cartoes||{}):{}; render(); },onErr));
 }
 /* ===================== Firebase: dados na casa ===================== */
-const VERSAO='2.1';
+const VERSAO='2.2';
 // Preencha com o firebaseConfig do projeto videofotista-monetario.
 const FIREBASE={apiKey:"AIzaSyDuLcLCnn1Y35rTJ2Ll5IA_WcLwmHHhTic",authDomain:"videofotista-monetario.firebaseapp.com",projectId:"videofotista-monetario",storageBucket:"videofotista-monetario.firebasestorage.app",messagingSenderId:"210279865763",appId:"1:210279865763:web:e507a4c06276b192c7ce16"};
 const EMU=new URLSearchParams(location.search).get('emu');
@@ -1156,10 +1157,11 @@ function mkDB(base){
   return {doc:docApi,collection:n=>colApi(n,[])};
 }
 const LKEY='vm_local_dados';
-let LS=null, LL=new Set(), lsTimer=null;
-function localCarregar(){ if(LS) return; LS={}; try{ const t=localStorage.getItem(LKEY); if(t) LS=JSON.parse(t)||{}; }catch(e){ LS={}; } }
-function localGravar(){ clearTimeout(lsTimer); lsTimer=setTimeout(()=>{ try{ localStorage.setItem(LKEY,JSON.stringify(LS)); }catch(e){ toast('Não consegui guardar neste aparelho. Baixe um backup em Ajustes.'); } },150); }
-function localMudou(){ localGravar(); setTimeout(()=>LL.forEach(f=>{ try{f()}catch(e){console.warn(e)} }),0); }
+let LS=null, LM=null, LL=new Set(), lsTimer=null;
+function localCarregar(){ if(LS) return; LS={}; LM={t:{},x:{}}; try{ const t=localStorage.getItem(LKEY); if(t) LS=JSON.parse(t)||{}; const m=localStorage.getItem(LKEY+'_meta'); if(m) LM=Object.assign({t:{},x:{}},JSON.parse(m)); }catch(e){ LS=LS||{}; } }
+function localGravar(){ clearTimeout(lsTimer); lsTimer=setTimeout(()=>{ try{ localStorage.setItem(LKEY,JSON.stringify(LS)); localStorage.setItem(LKEY+'_meta',JSON.stringify(LM)); }catch(e){ toast('Não consegui guardar neste aparelho. Baixe um backup em Ajustes.'); } },150); }
+function marcar(path,apagado){ const t=Date.now(); if(apagado){ LM.x[path]=t; delete LM.t[path]; } else { LM.t[path]=t; delete LM.x[path]; } }
+function localMudou(deFora){ localGravar(); setTimeout(()=>LL.forEach(f=>{ try{f()}catch(e){console.warn(e)} }),0); if(!deFora) driveAgendar(); }
 const cl=o=>o===undefined?undefined:JSON.parse(JSON.stringify(o));
 function mkLocalDB(){
   localCarregar();
@@ -1167,24 +1169,100 @@ function mkLocalDB(){
   const ouvir=f=>{ LL.add(f); setTimeout(f,0); return ()=>LL.delete(f); };
   const docApi=path=>({
     get:async()=>wd(path),
-    set:async d=>{ LS[path]=cl(d); localMudou(); },
-    update:async d=>{ if(LS[path]===undefined) throw Object.assign(new Error('não existe'),{code:'not-found'}); LS[path]=Object.assign({},LS[path],cl(d)); localMudou(); },
-    delete:async()=>{ delete LS[path]; localMudou(); },
+    set:async d=>{ LS[path]=cl(d); marcar(path); localMudou(); },
+    update:async d=>{ if(LS[path]===undefined) throw Object.assign(new Error('não existe'),{code:'not-found'}); LS[path]=Object.assign({},LS[path],cl(d)); marcar(path); localMudou(); },
+    delete:async()=>{ delete LS[path]; marcar(path,true); localMudou(); },
     onSnapshot:cb=>ouvir(()=>cb(wd(path))) });
   const colApi=(name,cons)=>{ const run=()=>{ const docs=[]; const pre=name+'/'; for(const k in LS){ if(k.startsWith(pre)&&!k.slice(pre.length).includes('/')&&cons.every(([f,op,v])=>op==='=='?LS[k][f]===v:true)) docs.push(wd(k)); } return {docs,size:docs.length,empty:!docs.length}; };
     return { doc:id=>docApi(name+'/'+id),
-      add:async d=>{ const id=Date.now().toString(36)+Math.random().toString(36).slice(2,8); LS[name+'/'+id]=cl(d); localMudou(); return {id}; },
+      add:async d=>{ const id=Date.now().toString(36)+Math.random().toString(36).slice(2,8); LS[name+'/'+id]=cl(d); marcar(name+'/'+id); localMudou(); return {id}; },
       get:async()=>run(),
       onSnapshot:cb=>ouvir(()=>cb(run())),
       where:(f,op,v)=>colApi(name,cons.concat([[f,op,v]])) }; };
   return {local:true,doc:docApi,collection:n=>colApi(n,[]),
-    lote:async ops=>{ for(const [p,d] of ops) LS[p]=cl(d); localMudou(); }};
+    lote:async ops=>{ for(const [p,d] of ops){ LS[p]=cl(d); marcar(p); } localMudou(); }};
 }
 function usarLocal(){
   pararTudo(); lsSet('vm_modo','local');
   S.local=true; S.casa={id:'local',nome:'Casa'};
-  S.db=mkLocalDB(); ligarCasa(); hideGate(); render(); autoBackup();
+  S.db=mkLocalDB(); ligarCasa(); hideGate(); render(); autoBackup(); driveIniciar();
 }
+/* ===================== Google Drive: sincronizar o modo sem conta ===================== */
+const GCLIENT='210279865763-ov6me7qi178cagbqmbbptktnfbiq7j59.apps.googleusercontent.com';
+const GSCOPE='https://www.googleapis.com/auth/drive.file openid email';
+const GARQ='Videofotista Monetário - dados.json';
+const naMacApp=()=>!!(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.salvar);
+const driveDisp=()=>!!GCLIENT&&!naMacApp();
+const driveOn=()=>lsGet('vm_drive')==='1';
+let gTok=null, gCli=null, gPend=null, syncT=null, syncRodando=false, syncDeNovo=false;
+S.sync={estado:'',quando:null};
+try{ gTok=JSON.parse(lsGet('vm_g_tok')||'null'); }catch(e){}
+const tokOk=()=>gTok&&gTok.exp>Date.now();
+function gisCarregar(){ return new Promise(ok=>{ if(window.google&&google.accounts&&google.accounts.oauth2) return ok(true); if(document.getElementById('gis')){ document.getElementById('gis').addEventListener('load',()=>ok(true)); return; } const sc=document.createElement('script'); sc.id='gis'; sc.src='https://accounts.google.com/gsi/client'; sc.async=true; sc.onload=()=>ok(true); sc.onerror=()=>ok(false); document.head.appendChild(sc); }); }
+function gCliente(){ if(gCli) return gCli; if(!(window.google&&google.accounts&&google.accounts.oauth2)) return null;
+  gCli=google.accounts.oauth2.initTokenClient({client_id:GCLIENT,scope:GSCOPE,
+    callback:async r=>{ const f=gPend; gPend=null; if(!r||r.error||!r.access_token){ syncEstado('precisa'); f&&f(false); return; }
+      gTok={token:r.access_token,exp:Date.now()+(Number(r.expires_in||3600)-120)*1000,email:gTok?.email||''};
+      try{ const u=await (await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:'Bearer '+gTok.token}})).json(); if(u&&u.email) gTok.email=u.email; }catch(e){}
+      lsSet('vm_g_tok',JSON.stringify(gTok)); f&&f(true); },
+    error_callback:()=>{ const f=gPend; gPend=null; syncEstado('precisa'); f&&f(false); } });
+  return gCli; }
+function pedirToken(primeira){ return new Promise(ok=>{ const c=gCliente(); if(!c){ toast('Não consegui falar com o Google. Confira a internet.'); ok(false); return; } gPend=ok; c.requestAccessToken(primeira?{prompt:'consent'}:{prompt:'',login_hint:gTok?.email||undefined}); }); }
+async function gFetch(url,opt={}){ const r=await fetch(url,Object.assign({},opt,{headers:Object.assign({Authorization:'Bearer '+gTok.token},opt.headers||{})}));
+  if(r.status===401||r.status===403){ gTok.exp=0; lsSet('vm_g_tok',JSON.stringify(gTok)); throw Object.assign(new Error('auth'),{auth:true}); }
+  if(!r.ok) throw new Error('drive '+r.status); return r; }
+async function driveAchar(){ const q=encodeURIComponent(`name='${GARQ}' and trashed=false`);
+  const j=await (await gFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&orderBy=modifiedTime desc&fields=files(id,modifiedTime)`)).json();
+  return (j.files&&j.files[0])?j.files[0].id:null; }
+async function driveBaixar(id){ return await (await gFetch(`https://www.googleapis.com/drive/v3/files/${id}?alt=media`)).json(); }
+async function driveSubir(id,obj){ const corpo=JSON.stringify(obj);
+  if(id){ await gFetch(`https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=media`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:corpo}); return id; }
+  const b='vmb'+Date.now(); const body=`--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({name:GARQ,mimeType:'application/json'})}\r\n--${b}\r\nContent-Type: application/json\r\n\r\n${corpo}\r\n--${b}--`;
+  const j=await (await gFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{method:'POST',headers:{'Content-Type':'multipart/related; boundary='+b},body})).json(); return j.id; }
+function fotoLocal(){ localCarregar(); const docs={}; for(const k in LS) docs[k]={t:LM.t[k]||1,d:LS[k]}; return {app:'videofotista-monetario',formato:2,docs,mortos:Object.assign({},LM.x)}; }
+function juntar(a,b){ const docs={},mortos={}; const ks=new Set([...Object.keys(a.docs||{}),...Object.keys(b.docs||{}),...Object.keys(a.mortos||{}),...Object.keys(b.mortos||{})]);
+  for(const k of ks){ const c=[a.docs?.[k],b.docs?.[k]].filter(Boolean).sort((x,y)=>y.t-x.t)[0]; const m=Math.max(a.mortos?.[k]||0,b.mortos?.[k]||0);
+    if(c&&c.t>m) docs[k]=c; else if(m) mortos[k]=m; }
+  return {app:'videofotista-monetario',formato:2,docs,mortos}; }
+const assin=f=>JSON.stringify(Object.keys(f.docs).sort().map(k=>[k,f.docs[k].t]))+JSON.stringify(Object.keys(f.mortos).sort());
+function syncEstado(e){ S.sync.estado=e; if(e==='ok') S.sync.quando=new Date(); syncRender(); }
+function syncRender(){ const el=document.getElementById('syncinfo'); if(!el) return;
+  if(!S.local||!driveOn()){ el.hidden=true; return; } el.hidden=false; el.classList.toggle('alerta',S.sync.estado==='precisa');
+  const hh=S.sync.quando?String(S.sync.quando.getHours()).padStart(2,'0')+':'+String(S.sync.quando.getMinutes()).padStart(2,'0'):'';
+  el.textContent=S.sync.estado==='rodando'?'☁ Sincronizando…':S.sync.estado==='precisa'?'☁ Toque para sincronizar com o Google Drive':S.sync.estado==='erro'?'☁ Sem conexão. Sincroniza depois':S.sync.estado==='ok'?`☁ Sincronizado às ${hh}`:'☁ Google Drive'; }
+async function sincronizar(){
+  if(!S.local||!driveOn()) return;
+  if(!tokOk()){ syncEstado('precisa'); return; }
+  if(syncRodando){ syncDeNovo=true; return; } syncRodando=true; syncEstado('rodando');
+  try{
+    let id=lsGet('vm_g_arq')||null; let remoto=null;
+    if(!id) id=await driveAchar();
+    if(id){ try{ remoto=await driveBaixar(id); }catch(e){ if(e.auth) throw e; id=await driveAchar(); remoto=id?await driveBaixar(id):null; } }
+    if(remoto&&remoto.formato===1&&remoto.lanc){ const d={}; if(remoto.config?.main) d['config/main']={t:1,d:remoto.config.main}; for(const n of ['lanc','recs','faturas']) for(const i in (remoto[n]||{})) d[n+'/'+i]={t:1,d:remoto[n][i]}; remoto={docs:d,mortos:{}}; }
+    const local=fotoLocal();
+    const semLanc=!Object.keys(LS).some(k=>k.startsWith('lanc/'));
+    const primeira=lsGet('vm_g_primeira')==='1';
+    const R0=remoto?{docs:remoto.docs||{},mortos:remoto.mortos||{}}:null;
+    const novo=R0?((primeira&&semLanc)?juntar(R0,{docs:{},mortos:{}}):juntar(local,R0)):local;
+    lsSet('vm_g_primeira','');
+    if(assin(novo)!==assin(local)){ LS={}; LM={t:{},x:Object.assign({},novo.mortos)}; for(const k in novo.docs){ LS[k]=novo.docs[k].d; LM.t[k]=novo.docs[k].t; } localMudou(true); S.all=null; }
+    if(!R0||assin(novo)!==assin(R0)) id=await driveSubir(id,novo);
+    if(id) lsSet('vm_g_arq',id);
+    syncEstado('ok');
+  }catch(e){ console.warn(e); syncEstado(e.auth?'precisa':'erro'); }
+  finally{ syncRodando=false; if(syncDeNovo){ syncDeNovo=false; setTimeout(sincronizar,500); } }
+}
+function driveAgendar(){ if(!S.local||!driveOn()) return; clearTimeout(syncT); syncT=setTimeout(sincronizar,3000); }
+function driveIniciar(){ if(!driveDisp()||!driveOn()){ syncRender(); return; } gisCarregar(); syncRender(); sincronizar(); }
+async function driveLigar(){
+  if(!driveDisp()) return;
+  if(!(window.google&&google.accounts&&google.accounts.oauth2)){ await gisCarregar(); toast('Toque de novo para entrar com o Google.'); return; }
+  const ok=await pedirToken(!gTok); if(!ok){ toast('Não deu para entrar com o Google.'); return; }
+  if(!driveOn()){ lsSet('vm_drive','1'); lsSet('vm_g_primeira','1'); lsSet('vm_g_arq',''); }
+  await sincronizar(); if(S.tab==='aj') render();
+}
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') sincronizar(); });
+setInterval(()=>{ if(document.visibilityState==='visible') sincronizar(); },90000);
 function pararTudo(){
   S.local=false; LL.clear();
   try{casaUnsub&&casaUnsub()}catch(e){} casaUnsub=null;
@@ -1199,7 +1277,7 @@ function showGate(tipo,info){
   let h=logoHtml;
   if(tipo==='login'){
     const cria=info==='criar';
-    if(!cria) h+=`<section class="blk"><div class="blk-h"><h3>Começar a usar</h3></div><p class="note">Sem cadastro: os seus dados ficam guardados só neste aparelho, com você. Ninguém mais vê.</p><div class="acts" style="justify-content:flex-start"><button class="btn accent" data-act="g_local">Começar</button></div></section>
+    if(!cria) h+=`<section class="blk"><div class="blk-h"><h3>Começar a usar</h3></div><p class="note">Sem cadastro: os seus dados ficam guardados só neste aparelho, com você. Ninguém mais vê.</p><div class="acts" style="justify-content:flex-start"><button class="btn accent" data-act="g_local">Começar</button></div></section>${driveDisp()?`<section class="blk"><div class="blk-h"><h3>Usar no celular e no computador</h3></div><p class="note">Entre com a sua conta Google: os dados ficam num arquivo no <b>seu</b> Google Drive, e o celular e o computador usam o mesmo arquivo. Ninguém mais vê.</p><div class="acts" style="justify-content:flex-start"><button class="btn ghost" data-act="g_google">Entrar com o Google</button></div></section>`:''}
     <p class="note" style="margin-top:22px">Foi convidado para uma casa? Entre com a sua conta:</p>`;
     h+=`<h2>${cria?'Criar conta':'Entrar'}</h2><p class="note">${cria?'Use o seu e-mail e crie uma senha só para este app (não precisa ser a do e-mail).':'Entre com o e-mail e a senha do Monetário.'}</p>
     <form id="g_form" autocomplete="on"><div class="fld"><label for="g_email">E-mail</label><input id="g_email" type="email" autocomplete="username" required value="${esc(lsGet('vm_email')||'')}"></div>
@@ -1207,7 +1285,7 @@ function showGate(tipo,info){
     <div class="err" id="g_err" hidden></div>
     <div class="acts"><button class="btn accent" type="submit">${cria?'Criar conta e entrar':'Entrar'}</button></div></form>
     <div class="acts">${cria?`<button class="lnk" data-act="g_login">Já tenho conta</button>`:`<button class="lnk" data-act="g_criar">Criar conta</button><button class="lnk" data-act="g_esqueci">Esqueci a senha</button>`}</div>`;
-    gatebox.innerHTML=h;
+    gatebox.innerHTML=h; if(!cria&&driveDisp()) gisCarregar();
     const f=document.getElementById('g_form');
     f.onsubmit=async ev=>{ ev.preventDefault(); const em=document.getElementById('g_email').value.trim().toLowerCase(), pw=document.getElementById('g_senha').value; const er=document.getElementById('g_err'); er.hidden=true;
       const btn=f.querySelector('button[type=submit]'); btn.disabled=true;
@@ -1324,7 +1402,8 @@ function abrirCafe(){
   <p class="note" style="text-align:center;margin:12px auto 0"><a href="https://renatoneto.com.br" target="_blank" rel="noopener" style="color:var(--accent)">renatoneto.com.br</a></p>`);
 }
 function casaHtml(){
-  if(S.local) return `<section class="blk"><div class="blk-h"><h3>Onde ficam os dados</h3></div><p class="note">Tudo fica guardado só neste aparelho, sem conta e sem nuvem. Ninguém mais vê.</p><p class="note" style="margin-top:8px"><b>Importante:</b> se o aparelho quebrar, for trocado ou o app for apagado, os dados vão junto. Baixe o backup completo (.json) uma vez por mês e guarde no Drive, no e-mail ou no computador. Para passar para outro aparelho, é só importar esse arquivo lá.</p><div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn accent" data-act="exportjson">Baixar backup completo (.json)</button></div><div style="margin-top:12px"><button class="btn ghost" data-act="sairlocal">Entrar com uma conta</button></div><p class="note" style="margin-top:6px">Os dados deste aparelho continuam guardados aqui.</p></section>`;
+  if(S.local&&driveOn()) return `<section class="blk"><div class="blk-h"><h3>Onde ficam os dados</h3></div><p class="note">Neste aparelho e no seu Google Drive${gTok?.email?` (<b>${esc(gTok.email)}</b>)`:''}, no arquivo "${esc(GARQ)}". Em outro celular ou computador, abra o app e toque em <b>Entrar com o Google</b> com a mesma conta: tudo aparece lá.</p><p class="note" style="margin-top:8px">Não apague nem mexa nesse arquivo no Drive. Mesmo assim, vale baixar o backup completo de vez em quando.</p><div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn accent" data-act="sync">Sincronizar agora</button><button class="btn ghost" data-act="exportjson">Baixar backup completo (.json)</button></div><div style="margin-top:12px"><button class="btn ghost" data-act="drivedesligar">Desligar a sincronização</button></div></section>`;
+  if(S.local) return `<section class="blk"><div class="blk-h"><h3>Onde ficam os dados</h3></div><p class="note">Tudo fica guardado só neste aparelho, sem conta e sem nuvem. Ninguém mais vê.</p>${driveDisp()?`<p class="note" style="margin-top:8px">Quer usar também em outro celular ou computador? Ligue a sincronização com o <b>seu</b> Google Drive.</p><div style="margin-top:8px"><button class="btn accent" data-act="driveligar">Sincronizar com o Google Drive</button></div>`:''}<p class="note" style="margin-top:8px"><b>Importante:</b> se o aparelho quebrar, for trocado ou o app for apagado, os dados vão junto. Baixe o backup completo (.json) uma vez por mês e guarde no Drive, no e-mail ou no computador. Para passar para outro aparelho, é só importar esse arquivo lá.</p><div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn accent" data-act="exportjson">Baixar backup completo (.json)</button></div><div style="margin-top:12px"><button class="btn ghost" data-act="sairlocal">Entrar com uma conta</button></div><p class="note" style="margin-top:6px">Os dados deste aparelho continuam guardados aqui.</p></section>`;
   if(!S.casa) return '';
   const em=(S.user?.email||'').toLowerCase(), dono=ehDono(), donoEm=S.casa.donoEmail;
   let h=`<section class="blk"><div class="blk-h"><h3>Casa e acesso</h3></div><p class="note" style="margin:0 0 8px">Você entrou como <b>${esc(em)}</b>${dono?' <span class="pill">dono</span>':''}. Quem está na lista abaixo vê e mexe em tudo.</p><div class="grp">`;
@@ -1341,6 +1420,9 @@ document.addEventListener('click',async ev=>{
   if(a==='copiachave'){ copiar(PIX.chave,'Chave Pix copiada'); return; }
   if(a==='g_criar'){ showGate('login','criar'); return; }
   if(a==='g_local'){ usarLocal(); return; }
+  if(a==='g_google'){ usarLocal(); driveLigar(); return; }
+  if(a==='sync'||a==='driveligar'){ if(tokOk()&&driveOn()) sincronizar(); else driveLigar(); return; }
+  if(a==='drivedesligar'){ if(b.dataset.armed!=='1'){ b.dataset.armed='1'; b.textContent='Confirmar: desligar'; return; } lsSet('vm_drive',''); lsSet('vm_g_arq',''); gTok=null; lsSet('vm_g_tok',''); syncRender(); render(); toast('Sincronização desligada. Os dados continuam neste aparelho e no Drive.'); return; }
   if(a==='g_sairlocal'){ pararTudo(); try{ await FB.signOut(auth); }catch(e){} usarLocal(); return; }
   if(a==='sairlocal'){ lsSet('vm_modo',''); pararTudo(); if(S.user) abrirCasa(); else showGate(window.FB&&auth?'login':'semconfig'); return; }
   if(a==='g_login'){ showGate('login'); return; }
