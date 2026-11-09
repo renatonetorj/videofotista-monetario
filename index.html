@@ -259,6 +259,7 @@ body{margin:0;padding-top:env(safe-area-inset-top,0px)}
 .sync{font-size:12px;color:var(--muted);text-align:center;margin:28px 0 0}
 .cafe-link{display:block;margin:26px auto 0;background:none;border:0;color:var(--muted);font-size:13px;font-weight:600;text-decoration:underline;text-underline-offset:3px}
 .cafe-link:hover{color:var(--accent)}
+.contato-bts{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}.contato-bts .btn{text-decoration:none;display:inline-flex;align-items:center}
 .qrbox{background:#fff;border-radius:14px;padding:12px;width:220px;height:220px;margin:14px auto 10px}
 .qrbox svg{width:100%;height:100%;display:block}
 .pixkey{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;margin-top:6px}
@@ -1124,7 +1125,7 @@ function subYear(){
   yearUnsubs.push(S.db.doc('faturas/'+y).onSnapshot(d=>{ if(y!==S.year) return; S.fat=d.exists?(d.data().cartoes||{}):{}; render(); },onErr));
 }
 /* ===================== Firebase: dados na casa ===================== */
-const VERSAO='2.4';
+const VERSAO='2.5';
 // Preencha com o firebaseConfig do projeto videofotista-monetario.
 const FIREBASE={apiKey:"AIzaSyDuLcLCnn1Y35rTJ2Ll5IA_WcLwmHHhTic",authDomain:"videofotista-monetario.firebaseapp.com",projectId:"videofotista-monetario",storageBucket:"videofotista-monetario.firebasestorage.app",messagingSenderId:"210279865763",appId:"1:210279865763:web:e507a4c06276b192c7ce16"};
 const EMU=new URLSearchParams(location.search).get('emu');
@@ -1409,7 +1410,15 @@ function abrirCafe(){
   <div class="pixkey"><button class="btn accent" data-act="copiapix">Copiar Pix Copia e Cola</button></div>
   <div class="pixkey" style="margin-top:12px"><span class="note" style="margin:0">Chave Pix (e-mail):</span><code>${esc(PIX.chave)}</code><button class="mini" data-act="copiachave">Copiar</button></div>
   <p class="note" style="text-align:center;margin:10px auto 0">No app do banco vai aparecer o meu nome completo: Renato dos Reis Paes Leme Neto. Obrigado!</p>
+  ${contatoHtml()}
   <p class="note" style="text-align:center;margin:12px auto 0"><a href="https://renatoneto.com.br" target="_blank" rel="noopener" style="color:var(--accent)">renatoneto.com.br</a></p>`);
+}
+function contatoHtml(){
+  const em=['renatonetorj','gmail.com'].join('@'), zap=['55','21','98112','5737'].join('');
+  const mail='mailto:'+em+'?subject='+encodeURIComponent('Videofotista Monetário');
+  const wa='https://wa.me/'+zap+'?text='+encodeURIComponent('Oi Renato, estou usando o Videofotista Monetário e ');
+  return `<div class="contato"><p class="note" style="text-align:center;margin:18px auto 8px">Dúvida, sugestão ou problema? Fala comigo:</p>
+  <div class="contato-bts"><a class="btn ghost" href="${mail}">✉️ E-mail</a><a class="btn ghost" href="${wa}" target="_blank" rel="noopener">💬 WhatsApp</a></div></div>`;
 }
 function casaHtml(){
   if(S.local&&driveOn()) return `<section class="blk"><div class="blk-h"><h3>Onde ficam os dados</h3></div><p class="note">Neste aparelho e no seu Google Drive${gTok?.email?` (<b>${esc(gTok.email)}</b>)`:''}, no arquivo "${esc(GARQ)}". Em outro celular ou computador, abra o app e toque em <b>Entrar com o Google</b> com a mesma conta: tudo aparece lá.</p><p class="note" style="margin-top:8px">Não apague nem mexa nesse arquivo no Drive. Mesmo assim, vale baixar o backup completo de vez em quando.</p><div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn accent" data-act="sync">Sincronizar agora</button><button class="btn ghost" data-act="exportjson">Baixar backup completo (.json)</button></div><div style="margin-top:12px"><button class="btn ghost" data-act="drivedesligar">Desligar a sincronização</button></div></section>`;
