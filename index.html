@@ -388,7 +388,7 @@ function renewals(){
 const main=document.getElementById('main');
 function render(){
   document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-current',String(b.dataset.tab===S.tab)));
-  document.getElementById('fab').hidden=!S.db||!S.cfg;
+  document.getElementById('fab').hidden=!S.db||!S.cfg||S.tab==='inicio';
   renderPeriod();
   if(!S.db){ main.innerHTML=`<p class="empty">Conectando…</p>`; return; }
   if(!S.cfg){ main.innerHTML=S.loaded.cfg?vazioHtml():`<p class="empty">Carregando os lançamentos…</p>`; return; }
