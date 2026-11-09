@@ -1124,7 +1124,7 @@ function subYear(){
   yearUnsubs.push(S.db.doc('faturas/'+y).onSnapshot(d=>{ if(y!==S.year) return; S.fat=d.exists?(d.data().cartoes||{}):{}; render(); },onErr));
 }
 /* ===================== Firebase: dados na casa ===================== */
-const VERSAO='2.3';
+const VERSAO='2.4';
 // Preencha com o firebaseConfig do projeto videofotista-monetario.
 const FIREBASE={apiKey:"AIzaSyDuLcLCnn1Y35rTJ2Ll5IA_WcLwmHHhTic",authDomain:"videofotista-monetario.firebaseapp.com",projectId:"videofotista-monetario",storageBucket:"videofotista-monetario.firebasestorage.app",messagingSenderId:"210279865763",appId:"1:210279865763:web:e507a4c06276b192c7ce16"};
 const EMU=new URLSearchParams(location.search).get('emu');
@@ -1136,7 +1136,7 @@ function initFB(){
   if(!EMU&&!FIREBASE.apiKey) return false;
   fbApp=FB.initializeApp(EMU?{apiKey:'demo-key',projectId:'demo-monetario',authDomain:'localhost'}:FIREBASE);
   auth=FB.initializeAuth(fbApp,{persistence:[FB.indexedDBLocalPersistence,FB.browserLocalPersistence]});
-  fs=FB.initializeFirestore(fbApp,{localCache:FB.memoryLocalCache(),ignoreUndefinedProperties:true});
+  fs=FB.initializeFirestore(fbApp,Object.assign({localCache:FB.memoryLocalCache(),ignoreUndefinedProperties:true},(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.salvar)?{experimentalForceLongPolling:true}:{experimentalAutoDetectLongPolling:true}));
   if(EMU){ FB.connectAuthEmulator(auth,'http://127.0.0.1:9099',{disableWarnings:true}); FB.connectFirestoreEmulator(fs,'127.0.0.1',8080); }
   return true;
 }
@@ -1335,8 +1335,12 @@ function usarCasa(id,data){
   casaUnsub=FB.onSnapshot(FB.doc(fs,'casas',id),s=>{ if(!s.exists()){ pararTudo(); showGate('semcasa'); return; } S.casa=Object.assign({id},s.data()); if(S.tab==='aj'&&!sheet.innerHTML) render(); },onErr);
   ligarCasa(); hideGate(); render(); autoBackup();
 }
+let cfgVigia=null;
 function ligarCasa(){
-  baseUnsubs.push(S.db.doc('config/main').onSnapshot(d=>{ S.loaded.cfg=true; S.cfg=d.exists?d.data():null; render(); },onErr));
+  clearTimeout(cfgVigia);
+  if(!S.local) cfgVigia=setTimeout(()=>{ if(!S.db||S.local||S.loaded.cfg) return; let ja=null; try{ ja=sessionStorage.getItem('vm_rel'); }catch(e){}
+    if(!ja){ try{ sessionStorage.setItem('vm_rel','1'); }catch(e){} location.reload(); } else showGate('erro','Os dados não chegaram. Confira a internet e tente de novo.'); },12000);
+  baseUnsubs.push(S.db.doc('config/main').onSnapshot(d=>{ S.loaded.cfg=true; try{ sessionStorage.removeItem('vm_rel'); }catch(e){} S.cfg=d.exists?d.data():null; render(); },onErr));
   baseUnsubs.push(S.db.collection('recs').onSnapshot(q=>{ S.recs=q.docs.map(d=>Object.assign({id:d.id},d.data())); render(); },onErr));
   subYear();
 }
