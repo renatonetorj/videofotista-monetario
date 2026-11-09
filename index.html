@@ -1124,7 +1124,7 @@ function subYear(){
   yearUnsubs.push(S.db.doc('faturas/'+y).onSnapshot(d=>{ if(y!==S.year) return; S.fat=d.exists?(d.data().cartoes||{}):{}; render(); },onErr));
 }
 /* ===================== Firebase: dados na casa ===================== */
-const VERSAO='2.2';
+const VERSAO='2.3';
 // Preencha com o firebaseConfig do projeto videofotista-monetario.
 const FIREBASE={apiKey:"AIzaSyDuLcLCnn1Y35rTJ2Ll5IA_WcLwmHHhTic",authDomain:"videofotista-monetario.firebaseapp.com",projectId:"videofotista-monetario",storageBucket:"videofotista-monetario.firebasestorage.app",messagingSenderId:"210279865763",appId:"1:210279865763:web:e507a4c06276b192c7ce16"};
 const EMU=new URLSearchParams(location.search).get('emu');
@@ -1194,20 +1194,22 @@ const GARQ='Videofotista Monetário - dados.json';
 const naMacApp=()=>!!(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.salvar);
 const driveDisp=()=>!!GCLIENT&&!naMacApp();
 const driveOn=()=>lsGet('vm_drive')==='1';
-let gTok=null, gCli=null, gPend=null, syncT=null, syncRodando=false, syncDeNovo=false;
+let gTok=null, gCli=null, gPend=null, gSemDrive=false, syncT=null, syncRodando=false, syncDeNovo=false;
 S.sync={estado:'',quando:null};
 try{ gTok=JSON.parse(lsGet('vm_g_tok')||'null'); }catch(e){}
 const tokOk=()=>gTok&&gTok.exp>Date.now();
 function gisCarregar(){ return new Promise(ok=>{ if(window.google&&google.accounts&&google.accounts.oauth2) return ok(true); if(document.getElementById('gis')){ document.getElementById('gis').addEventListener('load',()=>ok(true)); return; } const sc=document.createElement('script'); sc.id='gis'; sc.src='https://accounts.google.com/gsi/client'; sc.async=true; sc.onload=()=>ok(true); sc.onerror=()=>ok(false); document.head.appendChild(sc); }); }
 function gCliente(){ if(gCli) return gCli; if(!(window.google&&google.accounts&&google.accounts.oauth2)) return null;
   gCli=google.accounts.oauth2.initTokenClient({client_id:GCLIENT,scope:GSCOPE,
-    callback:async r=>{ const f=gPend; gPend=null; if(!r||r.error||!r.access_token){ syncEstado('precisa'); f&&f(false); return; }
+    callback:async r=>{ const f=gPend; gPend=null; if(!r||r.error||!r.access_token){ syncEstado('precisa'); toastLongo('O Google não liberou o acesso'+(r&&r.error?' ('+r.error+')':'')+'. Toque de novo em "Toque para sincronizar".'); f&&f(false); return; }
+      if(google.accounts.oauth2.hasGrantedAllScopes&&!google.accounts.oauth2.hasGrantedAllScopes(r,'https://www.googleapis.com/auth/drive.file')){ gSemDrive=true; syncEstado('semdrive'); toastLongo('Faltou marcar a caixinha do Google Drive. Toque no aviso amarelo e marque a caixinha antes de Continuar.'); f&&f(false); return; }
+      gSemDrive=false;
       gTok={token:r.access_token,exp:Date.now()+(Number(r.expires_in||3600)-120)*1000,email:gTok?.email||''};
       try{ const u=await (await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:'Bearer '+gTok.token}})).json(); if(u&&u.email) gTok.email=u.email; }catch(e){}
       lsSet('vm_g_tok',JSON.stringify(gTok)); f&&f(true); },
-    error_callback:()=>{ const f=gPend; gPend=null; syncEstado('precisa'); f&&f(false); } });
+    error_callback:e=>{ const f=gPend; gPend=null; syncEstado('precisa'); toastLongo(e&&e.type==='popup_failed_to_open'?'O navegador bloqueou a janela do Google. Libere pop-ups para este site e toque de novo.':'A janela do Google fechou antes de terminar. Toque no aviso amarelo para tentar de novo.'); f&&f(false); } });
   return gCli; }
-function pedirToken(primeira){ return new Promise(ok=>{ const c=gCliente(); if(!c){ toast('Não consegui falar com o Google. Confira a internet.'); ok(false); return; } gPend=ok; c.requestAccessToken(primeira?{prompt:'consent'}:{prompt:'',login_hint:gTok?.email||undefined}); }); }
+function pedirToken(primeira){ return new Promise(ok=>{ const c=gCliente(); if(!c){ toast('Não consegui falar com o Google. Confira a internet.'); ok(false); return; } gPend=ok; c.requestAccessToken((primeira||gSemDrive)?{prompt:'consent'}:{prompt:'',login_hint:gTok?.email||undefined}); }); }
 async function gFetch(url,opt={}){ const r=await fetch(url,Object.assign({},opt,{headers:Object.assign({Authorization:'Bearer '+gTok.token},opt.headers||{})}));
   if(r.status===401||r.status===403){ gTok.exp=0; lsSet('vm_g_tok',JSON.stringify(gTok)); throw Object.assign(new Error('auth'),{auth:true}); }
   if(!r.ok) throw new Error('drive '+r.status); return r; }
@@ -1225,14 +1227,15 @@ function juntar(a,b){ const docs={},mortos={}; const ks=new Set([...Object.keys(
     if(c&&c.t>m) docs[k]=c; else if(m) mortos[k]=m; }
   return {app:'videofotista-monetario',formato:2,docs,mortos}; }
 const assin=f=>JSON.stringify(Object.keys(f.docs).sort().map(k=>[k,f.docs[k].t]))+JSON.stringify(Object.keys(f.mortos).sort());
-function syncEstado(e){ S.sync.estado=e; if(e==='ok') S.sync.quando=new Date(); syncRender(); }
+function syncEstado(e){ S.sync.estado=e; if(e==='ok') S.sync.quando=new Date(); syncRender(); if(S.local&&!S.cfg&&S.loaded.cfg) render(); }
 function syncRender(){ const el=document.getElementById('syncinfo'); if(!el) return;
   if(!S.local||!driveOn()){ el.hidden=true; return; } el.hidden=false; el.classList.toggle('alerta',S.sync.estado==='precisa');
   const hh=S.sync.quando?String(S.sync.quando.getHours()).padStart(2,'0')+':'+String(S.sync.quando.getMinutes()).padStart(2,'0'):'';
-  el.textContent=S.sync.estado==='rodando'?'☁ Sincronizando…':S.sync.estado==='precisa'?'☁ Toque para sincronizar com o Google Drive':S.sync.estado==='erro'?'☁ Sem conexão. Sincroniza depois':S.sync.estado==='ok'?`☁ Sincronizado às ${hh}`:'☁ Google Drive'; }
+  el.classList.toggle('alerta',S.sync.estado==='precisa'||S.sync.estado==='semdrive');
+  el.textContent=S.sync.estado==='semdrive'?'☁ Toque e marque a caixinha do Google Drive':S.sync.estado==='rodando'?'☁ Sincronizando…':S.sync.estado==='precisa'?'☁ Toque para sincronizar com o Google Drive':S.sync.estado==='erro'?'☁ Sem conexão. Sincroniza depois':S.sync.estado==='ok'?`☁ Sincronizado às ${hh}`:'☁ Google Drive'; }
 async function sincronizar(){
   if(!S.local||!driveOn()) return;
-  if(!tokOk()){ syncEstado('precisa'); return; }
+  if(!tokOk()){ syncEstado(gSemDrive?'semdrive':'precisa'); return; }
   if(syncRodando){ syncDeNovo=true; return; } syncRodando=true; syncEstado('rodando');
   try{
     let id=lsGet('vm_g_arq')||null; let remoto=null;
@@ -1252,13 +1255,15 @@ async function sincronizar(){
   }catch(e){ console.warn(e); syncEstado(e.auth?'precisa':'erro'); }
   finally{ syncRodando=false; if(syncDeNovo){ syncDeNovo=false; setTimeout(sincronizar,500); } }
 }
+function toastLongo(m){ const t=document.getElementById('toast'); t.textContent=m; t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>t.hidden=true,7000); }
 function driveAgendar(){ if(!S.local||!driveOn()) return; clearTimeout(syncT); syncT=setTimeout(sincronizar,3000); }
 function driveIniciar(){ if(!driveDisp()||!driveOn()){ syncRender(); return; } gisCarregar(); syncRender(); sincronizar(); }
 async function driveLigar(){
   if(!driveDisp()) return;
   if(!(window.google&&google.accounts&&google.accounts.oauth2)){ await gisCarregar(); toast('Toque de novo para entrar com o Google.'); return; }
-  const ok=await pedirToken(!gTok); if(!ok){ toast('Não deu para entrar com o Google.'); return; }
   if(!driveOn()){ lsSet('vm_drive','1'); lsSet('vm_g_primeira','1'); lsSet('vm_g_arq',''); }
+  syncEstado('rodando');
+  const ok=await pedirToken(!tokOk()&&!gTok?.email); if(!ok){ if(S.sync.estado==='rodando') syncEstado('precisa'); return; }
   await sincronizar(); if(S.tab==='aj') render();
 }
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') sincronizar(); });
@@ -1343,6 +1348,7 @@ async function criarCasa(){
   catch(e){ console.warn(e); toast('Não consegui criar a casa. Confira a internet.'); }
 }
 function vazioHtml(){
+  if(S.local&&driveOn()&&S.sync.estado!=='ok') return `<section class="blk"><div class="blk-h"><h3>Ligando ao seu Google Drive</h3></div><p class="note">${S.sync.estado==='rodando'?'Um instante…':'Ainda não consegui abrir o seu Drive. Toque no aviso amarelo lá em cima para tentar de novo.'}</p><p class="note" style="margin-top:8px">Se preferir usar só neste aparelho:</p><div style="margin-top:8px"><button class="btn ghost" data-act="drivecancelar">Usar sem o Google</button></div></section>`;
   return `<section class="blk"><div class="blk-h"><h3>A casa está pronta</h3></div><p class="note">Comece do zero com algumas categorias básicas, que você pode mudar em Ajustes. Se já tiver um backup do Monetário (arquivo .json), importe aqui.</p>
   <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn accent" data-act="comecarzero">Começar do zero</button><button class="btn ghost" data-act="importjson">Importar backup (.json)</button></div></section>`;
 }
@@ -1422,6 +1428,7 @@ document.addEventListener('click',async ev=>{
   if(a==='g_local'){ usarLocal(); return; }
   if(a==='g_google'){ usarLocal(); driveLigar(); return; }
   if(a==='sync'||a==='driveligar'){ if(tokOk()&&driveOn()) sincronizar(); else driveLigar(); return; }
+  if(a==='drivecancelar'){ lsSet('vm_drive',''); lsSet('vm_g_arq',''); syncRender(); render(); return; }
   if(a==='drivedesligar'){ if(b.dataset.armed!=='1'){ b.dataset.armed='1'; b.textContent='Confirmar: desligar'; return; } lsSet('vm_drive',''); lsSet('vm_g_arq',''); gTok=null; lsSet('vm_g_tok',''); syncRender(); render(); toast('Sincronização desligada. Os dados continuam neste aparelho e no Drive.'); return; }
   if(a==='g_sairlocal'){ pararTudo(); try{ await FB.signOut(auth); }catch(e){} usarLocal(); return; }
   if(a==='sairlocal'){ lsSet('vm_modo',''); pararTudo(); if(S.user) abrirCasa(); else showGate(window.FB&&auth?'login':'semconfig'); return; }
