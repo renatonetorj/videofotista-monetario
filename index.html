@@ -256,8 +256,15 @@ body{margin:0;padding-top:env(safe-area-inset-top,0px)}
 #gate .err{margin-top:12px}
 .pill{display:inline-block;font-size:12px;font-weight:700;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:2px 8px;margin-left:6px}
 .sync{font-size:12px;color:var(--muted);text-align:center;margin:28px 0 0}
+.cafe-link{display:block;margin:26px auto 0;background:none;border:0;color:var(--muted);font-size:13px;font-weight:600;text-decoration:underline;text-underline-offset:3px}
+.cafe-link:hover{color:var(--accent)}
+.qrbox{background:#fff;border-radius:14px;padding:12px;width:220px;height:220px;margin:14px auto 10px}
+.qrbox svg{width:100%;height:100%;display:block}
+.pixkey{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;margin-top:6px}
+.pixkey code{background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:14px}
 </style>
 <script src="firebase.min.js"></script>
+<script src="qrcode.js"></script>
 </head>
 <body>
 <div id="gate" hidden><div class="box" id="gatebox"></div></div>
@@ -646,7 +653,7 @@ async function loadAll(){ if(!S.db) return; try{ const q=await S.db.collection('
   if(S.tab==='mes'&&S.mesView==='extrato'&&S.xPay) render(); if(S.tab==='busca') drawBusca(); if(document.getElementById('f_chips')) fillDescSugs(); }
 function renderBusca(){
   if(!main.querySelector('#q')){
-    main.innerHTML=`<div class="qbox"><input id="q" type="search" placeholder="Ex.: farmácia, Adobe, Álvaro, 71,00, março 2026" autocomplete="off" value="${esc(S.q||'')}"></div><div id="qres"></div>`;
+    main.innerHTML=`<div class="qbox"><input id="q" type="search" placeholder="Ex.: farmácia, mercado, 71,00, março 2026" autocomplete="off" value="${esc(S.q||'')}"></div><div id="qres"></div>`;
     main.querySelector('#q').addEventListener('input',e=>{S.q=e.target.value;drawBusca();});
     setTimeout(()=>main.querySelector('#q')?.focus(),30);
     S.all=null; loadAll();
@@ -659,7 +666,7 @@ function drawBusca(){
   const box=document.getElementById('qres'); if(!box) return;
   const q=norm(S.q).trim();
   if(!S.all){ box.innerHTML='<p class="qtips">Carregando todos os lançamentos…</p>'; return; }
-  if(!q){ box.innerHTML=`<p class="qtips">Procura em todos os anos, de 2022 até hoje. Dá pra buscar pelo nome da categoria, pelo comentário, pelo cliente, por onde foi pago (Pix Inter, Cartão Itaú), pelo valor (71,00) ou pelo mês (março 2026). Várias palavras juntas filtram mais, por exemplo "farmácia 2025".</p>`; return; }
+  if(!q){ box.innerHTML=`<p class="qtips">Procura em todos os anos. Dá pra buscar pelo nome da categoria, pelo comentário, pelo cliente, por onde foi pago (o nome do banco ou do cartão), pelo valor (71,00) ou pelo mês (março 2026). Várias palavras juntas filtram mais, por exemplo "farmácia 2025".</p>`; return; }
   const terms=q.split(/\s+/).filter(Boolean);
   const res=S.all.filter(l=>{const h=hay(l);return terms.every(t=>h.includes(t));}).sort((a,b)=>{ const k=S.qsort||'desc'; if(k==='valor') return b.valor-a.valor; const c=(a.comp+(a.data||'')).localeCompare(b.comp+(b.data||'')); return k==='asc'?c:-c; });
   const sai=r2(res.filter(l=>catById(l.cat)?.tipo!=='e').reduce((a,l)=>a+l.valor,0)), ent=r2(res.filter(l=>catById(l.cat)?.tipo==='e').reduce((a,l)=>a+l.valor,0));
@@ -719,7 +726,7 @@ function renderInicio(){
       h+=`<div class="due${i.n<0?' soon':''}"><div class="d"><b>${d}</b><small>${M3[Number(m)-1]}</small></div><span class="nm">${esc(i.nome)}<span class="when">${when}</span></span><span class="rt"><span class="num">~ ${fmt(i.valor)}</span><button class="mini ok" data-act="pagar" data-id="${esc(i.id)}" data-c="${i.comp}">Recebi</button></span></div>`; }
     h+=`</div></section>`; }
   if(last.length){ h+=`<section class="blk"><div class="blk-h"><h3>Últimos lançamentos</h3></div><div class="grp">${last.map(entryRow).join('')}</div></section>`; }
-  main.innerHTML=h;
+  main.innerHTML=h+cafeBtn();
 }
 function openFatPay(pid,comp){
   const p=payById(pid); const E=entries(); const det=r2(E.filter(e=>e.pay===pid&&e.comp===comp&&tipoOf(e)==='s').reduce((a,e)=>a+e.valor,0));
@@ -778,7 +785,7 @@ function renderAj(){
     }
     h+=`<div style="margin-top:10px"><button class="btn ghost" data-act="newcat" data-t="${tipo}">+ Nova categoria de ${tipo==='s'?'saída':'entrada'}</button></div></section>`;
   }
-  h+=`<section class="blk"><div class="blk-h"><h3>Cópia de segurança</h3></div><p class="note">Baixa uma planilha com o resumo do ano, todos os lançamentos e as assinaturas. Abre no Excel, no Google Planilhas ou no Numbers. Vale baixar uma vez por mês e guardar no Drive.</p><div style="margin-top:10px"><button class="btn accent" data-act="export">Baixar planilha de ${S.year} (.xlsx)</button></div><p class="note" style="margin-top:14px">Backup completo (todos os anos, cartões, contas fixas e faturas), para guardar com você.</p><div style="margin-top:8px"><button class="btn ghost" data-act="exportjson">Baixar backup completo (.json)</button> <button class="btn ghost" data-act="importjson">Importar backup (.json)</button></div>${window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.backup?`<p class="note" style="margin-top:10px">No Mac, o app também guarda sozinho um backup por dia em Documentos e no Google Drive.</p>`:''}</section>`+casaHtml()+`<p class="sync">Videofotista Monetário ${VERSAO}</p>`;
+  h+=`<section class="blk"><div class="blk-h"><h3>Cópia de segurança</h3></div><p class="note">Baixa uma planilha com o resumo do ano, todos os lançamentos e as assinaturas. Abre no Excel, no Google Planilhas ou no Numbers. Vale baixar uma vez por mês e guardar no Drive.</p><div style="margin-top:10px"><button class="btn accent" data-act="export">Baixar planilha de ${S.year} (.xlsx)</button></div><p class="note" style="margin-top:14px">Backup completo (todos os anos, cartões, contas fixas e faturas), para guardar com você.</p><div style="margin-top:8px"><button class="btn ghost" data-act="exportjson">Baixar backup completo (.json)</button> <button class="btn ghost" data-act="importjson">Importar backup (.json)</button></div>${window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.backup?`<p class="note" style="margin-top:10px">No Mac, o app também guarda sozinho um backup por dia em Documentos e no Google Drive.</p>`:''}</section>`+casaHtml()+cafeBtn()+`<p class="sync">Videofotista Monetário ${VERSAO} · Renato Neto, O Videofotista</p>`;
   h+=`<p class="note" style="margin-top:24px">Categorias riscadas estão arquivadas: somem da lista de lançar, mas o histórico continua nos totais.</p>`;
   main.innerHTML=h;
 }
@@ -923,7 +930,7 @@ function openRec(r){
   const ttl=isE?'entrada fixa':isC?'conta fixa':'assinatura';
   openSheet((r&&r.id?'Editar ':'Nova ')+ttl,`
     <input type="hidden" id="r_tipo" value="${esc(R.tipoRec)}">
-    <div class="fld"><label for="r_nome">Nome</label><input id="r_nome" value="${esc(R.nome)}" placeholder="${isE?'Ex.: Aposentadoria CNEN':'Ex.: Adobe Fotografia'}"></div>
+    <div class="fld"><label for="r_nome">Nome</label><input id="r_nome" value="${esc(R.nome)}" placeholder="${isE?'Ex.: Salário':'Ex.: Internet'}"></div>
     <div class="two"><div class="fld"><label for="r_valor">Valor (R$)</label><input id="r_valor" inputmode="decimal" value="${R.valor!==''?esc(fmtS(R.valor)):''}"></div>
     <div class="fld"><label for="r_pay">${isE?'Cai em':'Pago com'}</label><select id="r_pay">${payOptions(R.pay,isE)}</select></div></div>
     <div class="fld"><label for="r_cat">Categoria</label><select id="r_cat">${catOptions(isE?'e':'s',R.cat).replace('<option value="__new">+ Nova categoria…</option>','<option value="__new">+ Criar categoria com o mesmo nome</option>')}</select></div>
@@ -1176,7 +1183,7 @@ function showGate(tipo,info){
     const em=(S.user?.email||'').toLowerCase();
     h+=`<h2>Quase lá</h2><p class="note">Você entrou como <b>${esc(em)}</b>, mas ainda não faz parte de nenhuma casa.</p>
     <section class="blk"><div class="blk-h"><h3>Foi convidado(a)?</h3></div><p class="note">Peça para quem criou a casa te convidar com este e-mail: <b>${esc(em)}</b>. Depois toque em Verificar de novo.</p><div class="acts"><button class="btn accent" data-act="g_verificar">Verificar de novo</button></div></section>
-    <section class="blk"><div class="blk-h"><h3>É o primeiro a usar?</h3></div><p class="note">Crie a casa. Você vira o dono: pode convidar outras pessoas e trazer o backup do Monetário antigo.</p><div class="acts"><button class="btn ghost" data-act="g_criarcasa">Criar a minha casa</button></div></section>
+    <section class="blk"><div class="blk-h"><h3>É o primeiro a usar?</h3></div><p class="note">Crie a casa. Você vira o dono e pode convidar outras pessoas para lançar junto.</p><div class="acts"><button class="btn ghost" data-act="g_criarcasa">Criar a minha casa</button></div></section>
     <div class="acts"><button class="lnk" data-act="sair">Sair e entrar com outro e-mail</button></div>`;
     gatebox.innerHTML=h; return;
   }
@@ -1219,8 +1226,8 @@ async function criarCasa(){
   catch(e){ console.warn(e); toast('Não consegui criar a casa. Confira a internet.'); }
 }
 function vazioHtml(){
-  return `<section class="blk"><div class="blk-h"><h3>A casa está pronta</h3></div><p class="note">Agora é trazer os dados. No Monetário antigo (no Claude), vá em Ajustes e toque em <b>Baixar backup completo (.json)</b>. Depois escolha esse arquivo aqui.</p>
-  <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn accent" data-act="importjson">Importar backup (.json)</button><button class="btn ghost" data-act="comecarzero">Começar do zero</button></div></section>`;
+  return `<section class="blk"><div class="blk-h"><h3>A casa está pronta</h3></div><p class="note">Comece do zero com algumas categorias básicas, que você pode mudar em Ajustes. Se já tiver um backup do Monetário (arquivo .json), importe aqui.</p>
+  <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn accent" data-act="comecarzero">Começar do zero</button><button class="btn ghost" data-act="importjson">Importar backup (.json)</button></div></section>`;
 }
 async function comecarZero(){
   const cats=[['supermercado','Supermercado','Casa e contas'],['aluguel','Aluguel','Casa e contas'],['luz','Luz','Casa e contas'],['internet','Internet','Casa e contas'],['farmacia','Farmácia','Saúde'],['lanche','Lanche / restaurante','Lazer'],['transporte','Transporte','Transporte'],['outros-s','Outros gastos','Outros']].map(([id,nome,grupo],i)=>({id,nome,grupo,tipo:'s',ativo:true,cliente:false,ordem:i+1}))
@@ -1258,6 +1265,24 @@ function autoBackup(){
   const k='vm_bk_'+S.casa.id; if(lsGet(k)===todayStr) return;
   setTimeout(async()=>{ try{ if(!S.db) return; const b=await montarBackup(); if(!b.config.main) return; h.postMessage({nome:`MONETARIO_backup_${todayStr}.json`,texto:JSON.stringify(b)}); lsSet(k,todayStr); }catch(e){ console.warn(e); } },6000);
 }
+const PIX={chave:'rnbancointer@gmail.com',nome:'Renato Reis Neto',cidade:'Rio de Janeiro'};
+function crc16(s){ let c=0xFFFF; for(let i=0;i<s.length;i++){ c^=s.charCodeAt(i)<<8; for(let j=0;j<8;j++) c=(c&0x8000)?((c<<1)^0x1021)&0xFFFF:(c<<1)&0xFFFF; } return c.toString(16).toUpperCase().padStart(4,'0'); }
+function pixPayload(){ const f=(id,v)=>id+String(v.length).padStart(2,'0')+v; const sa=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const mai=f('00','br.gov.bcb.pix')+f('01',PIX.chave);
+  let p=f('00','01')+f('26',mai)+f('52','0000')+f('53','986')+f('58','BR')+f('59',sa(PIX.nome).slice(0,25))+f('60',sa(PIX.cidade).slice(0,15))+f('62',f('05','***'))+'6304';
+  return p+crc16(p); }
+const cafeBtn=()=>`<button class="cafe-link" data-act="cafe">☕ Gostou do app? Pague um café</button>`;
+async function copiar(t,ok){ try{ await navigator.clipboard.writeText(t); toast(ok); }catch(e){ const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy'); toast(ok);}catch(_){} ta.remove(); } }
+function abrirCafe(){
+  const code=pixPayload(); let svg='';
+  try{ const q=qrcode(0,'M'); q.addData(code); q.make(); svg=q.createSvgTag({cellSize:4,margin:0,scalable:true}); }catch(e){}
+  openSheet('Pague um café ☕',`<p class="note">O Videofotista Monetário é um presente feito por mim, Renato Neto, O Videofotista. Se ele te ajuda a cuidar do dinheiro da sua casa, um cafezinho, uma soda tônica ou uma água mineral com gás pelo Pix vão ser muito bem-vindos. Qualquer valor.</p>
+  ${svg?`<div class="qrbox" aria-label="QR Code do Pix">${svg}</div><p class="note" style="text-align:center;margin:0 auto">Aponte a câmera do app do banco, ou use o Pix Copia e Cola.</p>`:''}
+  <div class="pixkey"><button class="btn accent" data-act="copiapix">Copiar Pix Copia e Cola</button></div>
+  <div class="pixkey" style="margin-top:12px"><span class="note" style="margin:0">Chave Pix (e-mail):</span><code>${esc(PIX.chave)}</code><button class="mini" data-act="copiachave">Copiar</button></div>
+  <p class="note" style="text-align:center;margin:10px auto 0">No app do banco vai aparecer o meu nome completo: Renato dos Reis Paes Leme Neto. Obrigado!</p>
+  <p class="note" style="text-align:center;margin:12px auto 0"><a href="https://renatoneto.com.br" target="_blank" rel="noopener" style="color:var(--accent)">renatoneto.com.br</a></p>`);
+}
 function casaHtml(){
   if(!S.casa) return '';
   const em=(S.user?.email||'').toLowerCase(), dono=ehDono(), donoEm=S.casa.donoEmail;
@@ -1270,6 +1295,9 @@ function casaHtml(){
 }
 document.addEventListener('click',async ev=>{
   const b=ev.target.closest('[data-act]'); if(!b) return; const a=b.dataset.act;
+  if(a==='cafe'){ abrirCafe(); return; }
+  if(a==='copiapix'){ copiar(pixPayload(),'Pix Copia e Cola copiado. Cole no app do banco.'); return; }
+  if(a==='copiachave'){ copiar(PIX.chave,'Chave Pix copiada'); return; }
   if(a==='g_criar'){ showGate('login','criar'); return; }
   if(a==='g_login'){ showGate('login'); return; }
   if(a==='g_esqueci'){ const em=(document.getElementById('g_email')?.value||'').trim(); const er=document.getElementById('g_err');
