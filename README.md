@@ -24,7 +24,7 @@ O app não tem servidor: ninguém vê os seus dados, nem quem fez o app. Na prim
 
 ## No celular
 
-1. Abra **https://renatonetorj.github.io/videofotista-monetario/** no Safari (iPhone) ou no Chrome (Android)
+1. Abra **https://apps.renatoneto.com.br/videofotista-monetario/** no Safari (iPhone) ou no Chrome (Android)
 2. iPhone: Compartilhar > **Adicionar à Tela de Início**. Android: menu > **Adicionar à tela inicial**
 3. Abra pelo ícone novo e toque em **Começar** ou **Entrar com o Google**
 

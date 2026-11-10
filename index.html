@@ -1125,7 +1125,7 @@ function subYear(){
   yearUnsubs.push(S.db.doc('faturas/'+y).onSnapshot(d=>{ if(y!==S.year) return; S.fat=d.exists?(d.data().cartoes||{}):{}; render(); },onErr));
 }
 /* ===================== Firebase: dados na casa ===================== */
-const VERSAO='2.5';
+const VERSAO='2.6';
 // Preencha com o firebaseConfig do projeto videofotista-monetario.
 const FIREBASE={apiKey:"AIzaSyDuLcLCnn1Y35rTJ2Ll5IA_WcLwmHHhTic",authDomain:"videofotista-monetario.firebaseapp.com",projectId:"videofotista-monetario",storageBucket:"videofotista-monetario.firebasestorage.app",messagingSenderId:"210279865763",appId:"1:210279865763:web:e507a4c06276b192c7ce16"};
 const EMU=new URLSearchParams(location.search).get('emu');
@@ -1409,7 +1409,7 @@ function abrirCafe(){
   ${svg?`<div class="qrbox" aria-label="QR Code do Pix">${svg}</div><p class="note" style="text-align:center;margin:0 auto">Aponte a câmera do app do banco, ou use o Pix Copia e Cola.</p>`:''}
   <div class="pixkey"><button class="btn accent" data-act="copiapix">Copiar Pix Copia e Cola</button></div>
   <div class="pixkey" style="margin-top:12px"><span class="note" style="margin:0">Chave Pix (e-mail):</span><code>${esc(PIX.chave)}</code><button class="mini" data-act="copiachave">Copiar</button></div>
-  <p class="note" style="text-align:center;margin:10px auto 0">No app do banco vai aparecer o meu nome completo: Renato dos Reis Paes Leme Neto. Obrigado!</p>
+  <p class="note" style="text-align:center;margin:10px auto 0">No app do banco vai aparecer o meu nome completo:<br><span style="white-space:nowrap">Renato dos Reis Paes Leme Neto</span><br>Obrigado!</p>
   ${contatoHtml()}
   <p class="note" style="text-align:center;margin:12px auto 0"><a href="https://renatoneto.com.br" target="_blank" rel="noopener" style="color:var(--accent)">renatoneto.com.br</a></p>`);
 }
