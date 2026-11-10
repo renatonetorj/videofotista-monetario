@@ -18,8 +18,8 @@
 :root{
   /* Paleta do Renato: cinza #737373, branco e amarelo #ffde59. Tema único. */
   --bg:#3B3B3B; --surface:#474747; --sunk:#414141; --ink:#FFFFFF; --muted:#BDBDBD; --line:#575757;
-  --accent:#F4C84A; --accent-ink:#2B2B2B; --accent-soft:#544A2C;
-  --in:#F4C84A; --in-soft:#544A2C; --out:#FFFFFF; --out-soft:#3F3F3F; --neg:#FF9F8F; --prev:#D9D2FF;
+  --accent:#FFDE59; --accent-ink:#2B2B2B; --accent-soft:#55513F;
+  --in:#FFDE59; --in-soft:#55513F; --out:#FFFFFF; --out-soft:#3F3F3F; --neg:#FF9F8F; --prev:#D9D2FF;
   --f-display:-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
   --f-body:-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
   --r:12px; color-scheme:dark;
@@ -1125,7 +1125,7 @@ function subYear(){
   yearUnsubs.push(S.db.doc('faturas/'+y).onSnapshot(d=>{ if(y!==S.year) return; S.fat=d.exists?(d.data().cartoes||{}):{}; render(); },onErr));
 }
 /* ===================== Firebase: dados na casa ===================== */
-const VERSAO='2.6';
+const VERSAO='2.7';
 // Preencha com o firebaseConfig do projeto videofotista-monetario.
 const FIREBASE={apiKey:"AIzaSyDuLcLCnn1Y35rTJ2Ll5IA_WcLwmHHhTic",authDomain:"videofotista-monetario.firebaseapp.com",projectId:"videofotista-monetario",storageBucket:"videofotista-monetario.firebasestorage.app",messagingSenderId:"210279865763",appId:"1:210279865763:web:e507a4c06276b192c7ce16"};
 const EMU=new URLSearchParams(location.search).get('emu');
